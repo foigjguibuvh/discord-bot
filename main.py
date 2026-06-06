@@ -247,10 +247,8 @@ async def radio(ctx):
     if ctx.author.id != ctx.guild.owner_id:
         return
 
-    embed = discord.Embed(title="Radio", description="اضغط Connect للاتصال.")
-    embed.set_image(url="attachment://radio.png")
-    file = discord.File("radio.png", filename="radio.png")
-    await ctx.send(embed=embed, view=RadioView(), file=file)
+    embed = discord.Embed(title="📻 Radio", description="اضغط Connect للاتصال بالموجة.", color=0x2b2d31)
+    await ctx.send(embed=embed, view=RadioView())
 
 
 # ===== Events =====
