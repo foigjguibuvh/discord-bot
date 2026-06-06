@@ -39,6 +39,13 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 def has_role(member, role_id):
     return any(r.id == role_id for r in member.roles)
 
+@bot.event
+async def on_ready():
+    await bot.change_presence(
+        activity=discord.Game(name="Powered By FTRP .")
+    )
+    print(f"Bot is online: {bot.user}")
+
 class FrequencyModal(discord.ui.Modal):
     def __init__(self):
         super().__init__(title="Radio Frequency")
