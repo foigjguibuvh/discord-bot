@@ -194,6 +194,10 @@ class FrequencyModal(discord.ui.Modal):
             await interaction.response.send_message("التردد يجب أن يكون بين 0.1 و 999.9", ephemeral=True)
             return
 
+        # نحول لرقم صحيح لو كان بدون كسر (مثل 1.0 -> "1")
+        if f == int(f):
+            freq = str(int(f))
+
         if freq in GOV_CHANNELS:
             if freq in ["1","2","3","4","5","6","7"]:
                 if not has_role(member, POLICE_ROLE_ID):
