@@ -259,6 +259,7 @@ async def radio(ctx):
 
 @bot.event
 async def on_ready():
+    bot.add_view(RadioView())
     await bot.change_presence(activity=discord.Game(name="Powered By FTRP ."))
     print(f"Bot is online: {bot.user}")
 
