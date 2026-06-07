@@ -325,29 +325,13 @@ async def radio(ctx):
 async def panel(ctx):
     if ctx.channel.id != ADMIN_PANEL_CHANNEL_ID:
         return
-
-    member = ctx.author
-    # ابحث عن الموجة اللي هو قائدها
-    commander_channel_id = None
-    for ch_id, data in channel_data.items():
-        if data["commander"] == member.id:
-            commander_channel_id = ch_id
-            break
-
-    if commander_channel_id is None:
-        await ctx.send("❌ أنت لست قائد أي موجة حالياً.", delete_after=5)
-        await ctx.message.delete()
+    if not (ctx.author.guild_permissions.administrator or
+            has_role(ctx.author, POLICE_ROLE_ID) or
+            has_role(ctx.author, EMS_ROLE_ID) or
+            has_role(ctx.author, JUSTICE_ROLE_ID)):
         return
-
-    channel = ctx.guild.get_channel(commander_channel_id)
-    embed = discord.Embed(
-        title=f"🎛️ لوحة تحكم | {channel.name if channel else 'موجتك'}",
-        description="اختر الإجراء المطلوب:",
-        color=0x5865f2
-    )
-    view = PersonalCommanderPanel(commander_channel_id)
-    await ctx.author.send(embed=embed, view=view)
-    await ctx.message.delete()
+    embed = discord.Embed(title="🎛️ لوحة تحكم الراديو", description="اختر الإجراء المطلوب:", color=0x5865f2)
+    await ctx.send(embed=embed, view=AdminPanel())
 
 
 # ===== Events =====
