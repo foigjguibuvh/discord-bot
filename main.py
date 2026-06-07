@@ -188,7 +188,7 @@ class PersonalCommanderPanel(discord.ui.View):
         super().__init__(timeout=120)
         self.channel_id = channel_id
 
-    @discord.ui.button(label="فتح/قفل الموجة", emoji="🔒", style=discord.ButtonStyle.danger, custom_id="personal_lock")
+    @discord.ui.button(label="فتح/قفل الموجة", emoji="🔒", style=discord.ButtonStyle.danger)
     async def toggle_lock(self, button, interaction):
         if interaction.user.id != channel_data.get(self.channel_id, {}).get("commander"):
             await interaction.response.send_message("❌ هذه اللوحة ليست لك.", ephemeral=True)
@@ -209,7 +209,7 @@ class PersonalCommanderPanel(discord.ui.View):
             data["locked"] = True
             await interaction.response.send_message("🔒 تم **قفل** الموجة.", ephemeral=True)
 
-    @discord.ui.button(label="طرد عضو", emoji="👢", style=discord.ButtonStyle.secondary, custom_id="personal_kick")
+    @discord.ui.button(label="طرد عضو", emoji="👢", style=discord.ButtonStyle.secondary)
     async def kick_member(self, button, interaction):
         if interaction.user.id != channel_data.get(self.channel_id, {}).get("commander"):
             await interaction.response.send_message("❌ هذه اللوحة ليست لك.", ephemeral=True)
@@ -223,7 +223,7 @@ class PersonalCommanderPanel(discord.ui.View):
         view = KickSelectView(self.channel_id, options)
         await interaction.response.send_message("اختر العضو:", view=view, ephemeral=True)
 
-    @discord.ui.button(label="نقل القيادة", emoji="📢", style=discord.ButtonStyle.primary, custom_id="personal_transfer")
+    @discord.ui.button(label="نقل القيادة", emoji="📢", style=discord.ButtonStyle.primary)
     async def transfer(self, button, interaction):
         if interaction.user.id != channel_data.get(self.channel_id, {}).get("commander"):
             await interaction.response.send_message("❌ هذه اللوحة ليست لك.", ephemeral=True)
@@ -346,7 +346,7 @@ async def panel(ctx):
         color=0x5865f2
     )
     view = PersonalCommanderPanel(commander_channel_id)
-    msg = await ctx.send(embed=embed, view=view)
+    await ctx.author.send(embed=embed, view=view)
     await ctx.message.delete()
 
 
