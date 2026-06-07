@@ -180,6 +180,63 @@ class AdminClearSelect(discord.ui.View):
             await interaction.response.send_message("الموجة غير موجودة.", ephemeral=True)
 
 
+
+# ===== Personal Commander Panel =====
+
+class PersonalCommanderPanel(discord.ui.View):
+    def __init__(self, channel_id):
+        super().__init__(timeout=120)
+        self.channel_id = channel_id
+
+    @discord.ui.button(label="فتح/قفل الموجة", emoji="🔒", style=discord.ButtonStyle.danger, custom_id="personal_lock")
+    async def toggle_lock(self, button, interaction):
+        if interaction.user.id != channel_data.get(self.channel_id, {}).get("commander"):
+            await interaction.response.send_message("❌ هذه اللوحة ليست لك.", ephemeral=True)
+            return
+        data = channel_data.get(self.channel_id)
+        channel = interaction.guild.get_channel(self.channel_id)
+        if not data or not channel:
+            await interaction.response.send_message("الموجة غير موجودة.", ephemeral=True)
+            return
+        if data["locked"]:
+            await channel.set_permissions(interaction.guild.default_role, connect=True)
+            data["locked"] = False
+            await interaction.response.send_message("✅ تم **فتح** الموجة. 🔓", ephemeral=True)
+        else:
+            await channel.set_permissions(interaction.guild.default_role, connect=False)
+            for m in channel.members:
+                await channel.set_permissions(m, connect=True)
+            data["locked"] = True
+            await interaction.response.send_message("🔒 تم **قفل** الموجة.", ephemeral=True)
+
+    @discord.ui.button(label="طرد عضو", emoji="👢", style=discord.ButtonStyle.secondary, custom_id="personal_kick")
+    async def kick_member(self, button, interaction):
+        if interaction.user.id != channel_data.get(self.channel_id, {}).get("commander"):
+            await interaction.response.send_message("❌ هذه اللوحة ليست لك.", ephemeral=True)
+            return
+        channel = interaction.guild.get_channel(self.channel_id)
+        members = [m for m in channel.members if m.id != interaction.user.id]
+        if not members:
+            await interaction.response.send_message("لا يوجد أعضاء لطردهم.", ephemeral=True)
+            return
+        options = [discord.SelectOption(label=m.display_name, value=str(m.id)) for m in members]
+        view = KickSelectView(self.channel_id, options)
+        await interaction.response.send_message("اختر العضو:", view=view, ephemeral=True)
+
+    @discord.ui.button(label="نقل القيادة", emoji="📢", style=discord.ButtonStyle.primary, custom_id="personal_transfer")
+    async def transfer(self, button, interaction):
+        if interaction.user.id != channel_data.get(self.channel_id, {}).get("commander"):
+            await interaction.response.send_message("❌ هذه اللوحة ليست لك.", ephemeral=True)
+            return
+        channel = interaction.guild.get_channel(self.channel_id)
+        members = [m for m in channel.members if m.id != interaction.user.id]
+        if not members:
+            await interaction.response.send_message("لا يوجد أعضاء.", ephemeral=True)
+            return
+        options = [discord.SelectOption(label=m.display_name, value=str(m.id)) for m in members]
+        view = TransferSelectView(self.channel_id, options)
+        await interaction.response.send_message("اختر العضو:", view=view, ephemeral=True)
+
 # ===== Radio Modal & View =====
 
 class FrequencyModal(discord.ui.Modal):
@@ -212,15 +269,15 @@ class FrequencyModal(discord.ui.Modal):
         if freq in GOV_CHANNELS:
             if freq in GOV_POLICE:
                 if not has_role(member, POLICE_ROLE_ID):
-                    await interaction.response.send_message("🚫 موجة الشرطة فقط.", ephemeral=True)
+                    await interaction.response.send_message("🔐 هذه الموجة مشفرة.", ephemeral=True)
                     return
             elif freq in GOV_EMS:
                 if not has_role(member, EMS_ROLE_ID):
-                    await interaction.response.send_message("🚫 موجة الإسعاف فقط.", ephemeral=True)
+                    await interaction.response.send_message("🔐 هذه الموجة مشفرة.", ephemeral=True)
                     return
             elif freq in GOV_JUSTICE:
                 if not has_role(member, JUSTICE_ROLE_ID):
-                    await interaction.response.send_message("🚫 موجة العدل فقط.", ephemeral=True)
+                    await interaction.response.send_message("🔐 هذه الموجة مشفرة.", ephemeral=True)
                     return
 
             channel = interaction.guild.get_channel(GOV_CHANNELS[freq])
@@ -266,16 +323,31 @@ async def radio(ctx):
 
 @bot.command()
 async def panel(ctx):
-    # فقط في قناة الأدمن والمشرفين
     if ctx.channel.id != ADMIN_PANEL_CHANNEL_ID:
         return
-    if not (ctx.author.guild_permissions.administrator or
-            has_role(ctx.author, POLICE_ROLE_ID) or
-            has_role(ctx.author, EMS_ROLE_ID) or
-            has_role(ctx.author, JUSTICE_ROLE_ID)):
+
+    member = ctx.author
+    # ابحث عن الموجة اللي هو قائدها
+    commander_channel_id = None
+    for ch_id, data in channel_data.items():
+        if data["commander"] == member.id:
+            commander_channel_id = ch_id
+            break
+
+    if commander_channel_id is None:
+        await ctx.send("❌ أنت لست قائد أي موجة حالياً.", delete_after=5)
+        await ctx.message.delete()
         return
-    embed = discord.Embed(title="🎛️ لوحة تحكم الراديو", description="اختر الإجراء المطلوب:", color=0x5865f2)
-    await ctx.send(embed=embed, view=AdminPanel())
+
+    channel = ctx.guild.get_channel(commander_channel_id)
+    embed = discord.Embed(
+        title=f"🎛️ لوحة تحكم | {channel.name if channel else 'موجتك'}",
+        description="اختر الإجراء المطلوب:",
+        color=0x5865f2
+    )
+    view = PersonalCommanderPanel(commander_channel_id)
+    msg = await ctx.send(embed=embed, view=view)
+    await ctx.message.delete()
 
 
 # ===== Events =====
