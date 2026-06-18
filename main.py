@@ -47,6 +47,7 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 
 channel_data = {}
 banned_members = set()  # أعضاء محظورون من الراديو
+member_last_channel = {}  # { member_id: {"channel_name": str, "time": datetime} }
 
 def has_role(member, role_id):
     return any(r.id == role_id for r in member.roles)
@@ -82,6 +83,8 @@ class AdminPanel(discord.ui.View):
             discord.SelectOption(label="رسالة إذاعية", emoji="📢", value="broadcast"),
             discord.SelectOption(label="طرد عضو", emoji="👢", value="kick"),
             discord.SelectOption(label="تفريغ موجة", emoji="🗑️", value="clear"),
+            discord.SelectOption(label="سجل العضو", emoji="🔎", value="member_log"),
+            discord.SelectOption(label="تنبيه طوارئ", emoji="🚨", value="emergency"),
         ]
     )
     async def select_action(self, select, interaction):
@@ -212,6 +215,24 @@ class AdminPanel(discord.ui.View):
                     options.append(discord.SelectOption(label=channel.name, value=str(ch_id)))
             view = AdminClearSelect(options)
             await interaction.response.send_message("اختر الموجة للتفريغ:", view=view, ephemeral=True)
+            return
+
+        if action == "member_log":
+            members = interaction.guild.members
+            options = []
+            for m in members:
+                if m.id in member_last_channel:
+                    options.append(discord.SelectOption(label=m.display_name, value=str(m.id)))
+            if not options:
+                await interaction.response.send_message("لا يوجد سجل لأي عضو حالياً.", ephemeral=True)
+                return
+            options = options[:25]  # حد أقصى 25 خيار في القائمة
+            view = AdminMemberLogSelect(options)
+            await interaction.response.send_message("اختر العضو:", view=view, ephemeral=True)
+            return
+
+        if action == "emergency":
+            await interaction.response.send_modal(EmergencyModal())
             return
 
 
@@ -434,6 +455,54 @@ class BroadcastModal(discord.ui.Modal):
             await text_channel.send(embed=embed)
         await interaction.response.send_message("✅ تم إرسال الرسالة الإذاعية.", ephemeral=True)
 
+
+class AdminMemberLogSelect(discord.ui.View):
+    def __init__(self, options):
+        super().__init__(timeout=30)
+        select = discord.ui.Select(placeholder="اختر عضو...", options=options)
+        select.callback = self.callback
+        self.add_item(select)
+
+    async def callback(self, interaction: discord.Interaction):
+        member_id = int(self.children[0].values[0])
+        member = interaction.guild.get_member(member_id)
+        info = member_last_channel.get(member_id)
+
+        if not info:
+            await interaction.response.send_message("لا يوجد سجل لهذا العضو.", ephemeral=True)
+            return
+
+        time_str = discord.utils.format_dt(info["time"], style="R")
+        embed = discord.Embed(title="🔎 سجل العضو", color=0x5865f2)
+        embed.add_field(name="العضو", value=member.display_name if member else str(member_id), inline=False)
+        embed.add_field(name="آخر موجة", value=info["channel_name"], inline=False)
+        embed.add_field(name="وقت الدخول", value=time_str, inline=False)
+
+        # هذه الرسالة ephemeral، يشوفها الادمن فقط
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+
+class EmergencyModal(discord.ui.Modal):
+    def __init__(self):
+        super().__init__(title="تنبيه طوارئ")
+        self.add_item(discord.ui.InputText(label="الرسالة", placeholder="اكتب رسالة التنبيه...", required=True, style=discord.InputTextStyle.paragraph))
+
+    async def callback(self, interaction: discord.Interaction):
+        message = self.children[0].value
+        embed = discord.Embed(title="🚨 تنبيه طوارئ", description=message, color=0xff0000)
+        embed.set_footer(text=f"من: {interaction.user.display_name}")
+
+        text_channel = interaction.guild.get_channel(TEXT_CHANNEL_ID)
+        if text_channel:
+            mentions = f"<@&{POLICE_ROLE_ID}> <@&{EMS_ROLE_ID}> <@&{JUSTICE_ROLE_ID}>"
+            try:
+                await text_channel.send(content=mentions, embed=embed)
+                await interaction.response.send_message("🚨 تم إرسال التنبيه لجميع الجهات الحكومية.", ephemeral=True)
+            except:
+                await interaction.response.send_message("❌ تعذر إرسال التنبيه.", ephemeral=True)
+        else:
+            await interaction.response.send_message("❌ القناة النصية غير موجودة.", ephemeral=True)
+
 # ===== Radio Modal & View =====
 
 class FrequencyModal(discord.ui.Modal):
@@ -580,6 +649,10 @@ async def on_voice_state_update(member, before, after):
     # تسجيل الدخول
     if is_radio_channel(after.channel) and before.channel != after.channel:
         await send_log(member.guild, member, after.channel, "دخل")
+        member_last_channel[member.id] = {
+            "channel_name": after.channel.name,
+            "time": discord.utils.utcnow()
+        }
 
     # تسجيل الخروج
     if is_radio_channel(before.channel) and before.channel != after.channel:
