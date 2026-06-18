@@ -69,133 +69,150 @@ class AdminPanel(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
 
-    @discord.ui.button(label="الموجات النشطة", emoji="📋", style=discord.ButtonStyle.primary, custom_id="admin_list")
-    async def list_channels(self, button, interaction):
-        rows = get_active_channels(interaction.guild)
-        embed = discord.Embed(title="📋 الموجات النشطة", description="\n".join(rows), color=0x5865f2)
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+    @discord.ui.select(
+        placeholder="اختر الإجراء المطلوب...",
+        custom_id="admin_main_select",
+        options=[
+            discord.SelectOption(label="الموجات النشطة", emoji="📋", value="list"),
+            discord.SelectOption(label="قفل موجة", emoji="🔒", value="lock"),
+            discord.SelectOption(label="قفل كل الموجات", emoji="🔐", value="lockall"),
+            discord.SelectOption(label="إسكات موجة", emoji="🔇", value="mute"),
+            discord.SelectOption(label="نقل عضو", emoji="↗️", value="move"),
+            discord.SelectOption(label="حظر من الراديو", emoji="🚫", value="ban"),
+            discord.SelectOption(label="رسالة إذاعية", emoji="📢", value="broadcast"),
+            discord.SelectOption(label="طرد عضو", emoji="👢", value="kick"),
+            discord.SelectOption(label="تفريغ موجة", emoji="🗑️", value="clear"),
+        ]
+    )
+    async def select_action(self, select, interaction):
+        action = select.values[0]
 
-    @discord.ui.button(label="قفل موجة", emoji="🔒", style=discord.ButtonStyle.danger, custom_id="admin_lock")
-    async def lock_channel(self, button, interaction):
-        if not channel_data:
-            await interaction.response.send_message("لا توجد موجات نشطة.", ephemeral=True)
+        if action == "list":
+            rows = get_active_channels(interaction.guild)
+            embed = discord.Embed(title="📋 الموجات النشطة", description="\n".join(rows), color=0x5865f2)
+            await interaction.response.send_message(embed=embed, ephemeral=True)
             return
-        options = []
-        for ch_id, data in channel_data.items():
-            channel = interaction.guild.get_channel(ch_id)
-            if channel:
-                locked = "🔒" if data["locked"] else "🔓"
-                options.append(discord.SelectOption(label=f"{locked} {channel.name}", value=str(ch_id)))
-        view = AdminLockSelect(options)
-        await interaction.response.send_message("اختر الموجة:", view=view, ephemeral=True)
 
-    @discord.ui.button(label="قفل كل الموجات", emoji="🔐", style=discord.ButtonStyle.danger, custom_id="admin_lockall")
-    async def lock_all(self, button, interaction):
-        if not channel_data:
-            await interaction.response.send_message("لا توجد موجات نشطة.", ephemeral=True)
+        if action == "lock":
+            if not channel_data:
+                await interaction.response.send_message("لا توجد موجات نشطة.", ephemeral=True)
+                return
+            options = []
+            for ch_id, data in channel_data.items():
+                channel = interaction.guild.get_channel(ch_id)
+                if channel:
+                    locked = "🔒" if data["locked"] else "🔓"
+                    options.append(discord.SelectOption(label=f"{locked} {channel.name}", value=str(ch_id)))
+            view = AdminLockSelect(options)
+            await interaction.response.send_message("اختر الموجة:", view=view, ephemeral=True)
             return
-        count = 0
-        for ch_id, data in channel_data.items():
-            channel = interaction.guild.get_channel(ch_id)
-            if channel and not data["locked"]:
-                await channel.set_permissions(interaction.guild.default_role, connect=False)
-                for m in channel.members:
-                    await channel.set_permissions(m, connect=True)
-                data["locked"] = True
-                count += 1
-        await interaction.response.send_message(f"🔐 تم قفل {count} موجة.", ephemeral=True)
 
-    @discord.ui.button(label="إسكات موجة", emoji="🔇", style=discord.ButtonStyle.secondary, custom_id="admin_mute")
-    async def mute_channel(self, button, interaction):
-        if not channel_data:
-            await interaction.response.send_message("لا توجد موجات نشطة.", ephemeral=True)
+        if action == "lockall":
+            if not channel_data:
+                await interaction.response.send_message("لا توجد موجات نشطة.", ephemeral=True)
+                return
+            count = 0
+            for ch_id, data in channel_data.items():
+                channel = interaction.guild.get_channel(ch_id)
+                if channel and not data["locked"]:
+                    await channel.set_permissions(interaction.guild.default_role, connect=False)
+                    for m in channel.members:
+                        await channel.set_permissions(m, connect=True)
+                    data["locked"] = True
+                    count += 1
+            await interaction.response.send_message(f"🔐 تم قفل {count} موجة.", ephemeral=True)
             return
-        options = []
-        for ch_id in channel_data:
-            channel = interaction.guild.get_channel(ch_id)
-            if channel and channel.members:
-                options.append(discord.SelectOption(label=channel.name, value=str(ch_id)))
-        if not options:
-            await interaction.response.send_message("لا يوجد أعضاء في الموجات.", ephemeral=True)
-            return
-        view = AdminMuteSelect(options)
-        await interaction.response.send_message("اختر الموجة للإسكات:", view=view, ephemeral=True)
 
-    @discord.ui.button(label="نقل عضو", emoji="↗️", style=discord.ButtonStyle.primary, custom_id="admin_move")
-    async def move_member(self, button, interaction):
-        if not channel_data:
-            await interaction.response.send_message("لا توجد موجات نشطة.", ephemeral=True)
+        if action == "mute":
+            if not channel_data:
+                await interaction.response.send_message("لا توجد موجات نشطة.", ephemeral=True)
+                return
+            options = []
+            for ch_id in channel_data:
+                channel = interaction.guild.get_channel(ch_id)
+                if channel and channel.members:
+                    options.append(discord.SelectOption(label=channel.name, value=str(ch_id)))
+            if not options:
+                await interaction.response.send_message("لا يوجد أعضاء في الموجات.", ephemeral=True)
+                return
+            view = AdminMuteSelect(options)
+            await interaction.response.send_message("اختر الموجة للإسكات:", view=view, ephemeral=True)
             return
-        options = []
-        for ch_id in channel_data:
-            channel = interaction.guild.get_channel(ch_id)
-            if channel:
-                for m in channel.members:
-                    options.append(discord.SelectOption(
-                        label=f"{m.display_name} ({channel.name})",
-                        value=f"{m.id}"
-                    ))
-        if not options:
-            await interaction.response.send_message("لا يوجد أعضاء.", ephemeral=True)
-            return
-        view = AdminMoveSelect(options, interaction.guild)
-        await interaction.response.send_message("اختر العضو للنقل:", view=view, ephemeral=True)
 
-    @discord.ui.button(label="حظر من الراديو", emoji="🚫", style=discord.ButtonStyle.danger, custom_id="admin_ban")
-    async def ban_member(self, button, interaction):
-        # نجمع كل الأعضاء في الموجات + خيار إدخال يدوي
-        options = []
-        seen = set()
-        for ch_id in channel_data:
-            channel = interaction.guild.get_channel(ch_id)
-            if channel:
-                for m in channel.members:
-                    if m.id not in seen:
-                        seen.add(m.id)
-                        status = "🚫" if m.id in banned_members else "✅"
-                        options.append(discord.SelectOption(label=f"{status} {m.display_name}", value=str(m.id)))
-        if not options:
-            await interaction.response.send_message("لا يوجد أعضاء في الموجات حالياً.", ephemeral=True)
+        if action == "move":
+            if not channel_data:
+                await interaction.response.send_message("لا توجد موجات نشطة.", ephemeral=True)
+                return
+            options = []
+            for ch_id in channel_data:
+                channel = interaction.guild.get_channel(ch_id)
+                if channel:
+                    for m in channel.members:
+                        options.append(discord.SelectOption(
+                            label=f"{m.display_name} ({channel.name})",
+                            value=f"{m.id}"
+                        ))
+            if not options:
+                await interaction.response.send_message("لا يوجد أعضاء.", ephemeral=True)
+                return
+            view = AdminMoveSelect(options, interaction.guild)
+            await interaction.response.send_message("اختر العضو للنقل:", view=view, ephemeral=True)
             return
-        view = AdminBanSelect(options)
-        await interaction.response.send_message("اختر العضو للحظر/رفع الحظر:", view=view, ephemeral=True)
 
-    @discord.ui.button(label="رسالة إذاعية", emoji="📢", style=discord.ButtonStyle.primary, custom_id="admin_broadcast")
-    async def broadcast(self, button, interaction):
-        await interaction.response.send_modal(BroadcastModal())
+        if action == "ban":
+            options = []
+            seen = set()
+            for ch_id in channel_data:
+                channel = interaction.guild.get_channel(ch_id)
+                if channel:
+                    for m in channel.members:
+                        if m.id not in seen:
+                            seen.add(m.id)
+                            status = "🚫" if m.id in banned_members else "✅"
+                            options.append(discord.SelectOption(label=f"{status} {m.display_name}", value=str(m.id)))
+            if not options:
+                await interaction.response.send_message("لا يوجد أعضاء في الموجات حالياً.", ephemeral=True)
+                return
+            view = AdminBanSelect(options)
+            await interaction.response.send_message("اختر العضو للحظر/رفع الحظر:", view=view, ephemeral=True)
+            return
 
-    @discord.ui.button(label="طرد عضو", emoji="👢", style=discord.ButtonStyle.secondary, custom_id="admin_kick")
-    async def kick_member(self, button, interaction):
-        if not channel_data:
-            await interaction.response.send_message("لا توجد موجات نشطة.", ephemeral=True)
+        if action == "broadcast":
+            await interaction.response.send_modal(BroadcastModal())
             return
-        options = []
-        for ch_id in channel_data:
-            channel = interaction.guild.get_channel(ch_id)
-            if channel:
-                for m in channel.members:
-                    options.append(discord.SelectOption(
-                        label=f"{m.display_name} ({channel.name})",
-                        value=f"{ch_id}:{m.id}"
-                    ))
-        if not options:
-            await interaction.response.send_message("لا يوجد أعضاء في الموجات.", ephemeral=True)
-            return
-        view = AdminKickSelect(options)
-        await interaction.response.send_message("اختر العضو:", view=view, ephemeral=True)
 
-    @discord.ui.button(label="تفريغ موجة", emoji="🗑️", style=discord.ButtonStyle.danger, custom_id="admin_clear")
-    async def clear_channel(self, button, interaction):
-        if not channel_data:
-            await interaction.response.send_message("لا توجد موجات نشطة.", ephemeral=True)
+        if action == "kick":
+            if not channel_data:
+                await interaction.response.send_message("لا توجد موجات نشطة.", ephemeral=True)
+                return
+            options = []
+            for ch_id in channel_data:
+                channel = interaction.guild.get_channel(ch_id)
+                if channel:
+                    for m in channel.members:
+                        options.append(discord.SelectOption(
+                            label=f"{m.display_name} ({channel.name})",
+                            value=f"{ch_id}:{m.id}"
+                        ))
+            if not options:
+                await interaction.response.send_message("لا يوجد أعضاء في الموجات.", ephemeral=True)
+                return
+            view = AdminKickSelect(options)
+            await interaction.response.send_message("اختر العضو:", view=view, ephemeral=True)
             return
-        options = []
-        for ch_id in channel_data:
-            channel = interaction.guild.get_channel(ch_id)
-            if channel:
-                options.append(discord.SelectOption(label=channel.name, value=str(ch_id)))
-        view = AdminClearSelect(options)
-        await interaction.response.send_message("اختر الموجة للتفريغ:", view=view, ephemeral=True)
+
+        if action == "clear":
+            if not channel_data:
+                await interaction.response.send_message("لا توجد موجات نشطة.", ephemeral=True)
+                return
+            options = []
+            for ch_id in channel_data:
+                channel = interaction.guild.get_channel(ch_id)
+                if channel:
+                    options.append(discord.SelectOption(label=channel.name, value=str(ch_id)))
+            view = AdminClearSelect(options)
+            await interaction.response.send_message("اختر الموجة للتفريغ:", view=view, ephemeral=True)
+            return
 
 
 class AdminLockSelect(discord.ui.View):
@@ -473,7 +490,7 @@ class FrequencyModal(discord.ui.Modal):
                 await interaction.response.send_message("القناة غير موجودة.", ephemeral=True)
                 return
             await member.move_to(channel)
-            await interaction.response.send_message(f"🔘 | {channel.name}", ephemeral=True)
+            await interaction.response.send_message(f"🔘 تـم الأتــصـال بـالـمـوجـة {channel.name}", ephemeral=True)
             return
 
         category = interaction.guild.get_channel(RADIO_CATEGORY_ID)
@@ -488,7 +505,7 @@ class FrequencyModal(discord.ui.Modal):
             voice = await interaction.guild.create_voice_channel(room_name, category=category)
 
         await member.move_to(voice)
-        await interaction.response.send_message(f"🔘 | Hz {freq}", ephemeral=True)
+        await interaction.response.send_message(f"🔘 تـم الأتــصـال بـالـمـوجـة {freq}", ephemeral=True)
 
 
 class RadioView(discord.ui.View):
